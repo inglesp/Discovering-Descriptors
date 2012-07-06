@@ -1,0 +1,7 @@
+This is the code for my talk 'Discovering Descriptors' at Europython 2012.
+
+To run the code, get hold of prescons.py (a "pseudo-interactive" python
+interpreter) from https://github.com/inglesp/prescons, and run with:
+
+  $ python3 prescons.py descriptors.py
+

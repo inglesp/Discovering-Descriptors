@@ -1,0 +1,356 @@
+Python 3.2.3 (default, Jun 17 2012, 21:56:28) 
+[GCC 4.2.1 Compatible Apple Clang 3.1 (tags/Apple/clang-318.0.58)] on darwin
+Type "help", "copyright", "credits" or "license" for more information.
+(NonInteractiveFileReadingPresentationConsole)
+>>> ###
+>>> # Discovering Descriptors
+>>> #
+>>> # 6th July
+>>> #
+>>> # Peter Inglesby
+>>> # @inglesp / peter.inglesby@gmail.com
+>>> ###
+>>> 
+>>> # Goals:
+>>> #  * explain the descriptor protocol
+>>> #  * demonstrate how descriptors are used in implementation of Python
+>>> #  * provide examples of how descriptors can be used in your own code
+>>> 
+>>> # Let's get going
+>>> class C:
+...     class_attr = 123
+...     def __init__(self):
+...         self.instance_attr = 456
+... 
+>>> i = C()
+>>> i.instance_attr
+456
+>>> i.class_attr
+123
+>>> 
+>>> # What happens when we look up an attribute on an instance?
+>>> i.__dict__
+{'instance_attr': 456}
+>>> C.__dict__
+dict_proxy({'__module__': '__console__', 'class_attr': 123, '__dict__': <attribute '__dict__' of 'C' objects>, '__weakref__': <attribute '__weakref__' of 'C' objects>, '__doc__': None, '__init__': <function __init__ at 0x100538af0>})
+>>> 
+>>> # Where do descriptors come in?
+>>> class RandomAttribute:
+...     def __init__(self, n):
+...         self.n = n
+...     def __get__(self, inst, cls):
+...         import random
+...         print("calling __get__ on instance of RandomAttribute")
+...         return random.randint(1, self.n)
+... 
+>>> class C:
+...     random_attr = RandomAttribute(10)
+... 
+>>> i = C()
+>>> i.__dict__
+{}
+>>> C.__dict__
+dict_proxy({'__dict__': <attribute '__dict__' of 'C' objects>, '__module__': '__console__', '__weakref__': <attribute '__weakref__' of 'C' objects>, 'random_attr': <__console__.RandomAttribute object at 0x100566990>, '__doc__': None})
+>>> i.random_attr
+calling __get__ on instance of RandomAttribute
+8
+>>> i.random_attr
+calling __get__ on instance of RandomAttribute
+1
+>>> i.random_attr
+calling __get__ on instance of RandomAttribute
+7
+>>> 
+>>> # A descriptor is an object that defines at least one of:
+>>> #  * __get__()
+>>> #  * __set__()
+>>> #  * __delete__()
+>>> 
+>>> # How about something more interesting?
+>>> class CachedAttribute:
+...     def __init__(self, name, func):
+...         self.name = name
+...         self.func = func
+...     def __get__(self, inst, cls):
+...         print("calling __get__ on instance of CachedAttribute")
+...         inst.__dict__[self.name] = self.func(inst)
+...         return inst.__dict__[self.name]
+... 
+>>> class C:
+...     def expensive_calculation(self):
+...         import time
+...         time.sleep(5)
+...         return 42
+...     attr = CachedAttribute('attr', expensive_calculation)
+... 
+>>> i = C()
+>>> i.__dict__
+{}
+>>> i.attr
+calling __get__ on instance of CachedAttribute
+42
+>>> i.__dict__
+{'attr': 42}
+>>> i.attr
+42
+>>> 
+>>> # One more (useless) example
+>>> class NoisyDescriptor:
+...     def __get__(self, inst, cls):
+...         print("calling __get__ on instance of NoisyDescriptor")
+...         print("  self:", self)
+...         print("  inst:", inst)
+...         print("  cls: ", cls)
+... 
+>>> class C:
+...     attr = NoisyDescriptor()
+... 
+>>> i = C()
+>>> i.attr
+calling __get__ on instance of NoisyDescriptor
+  self: <__console__.NoisyDescriptor object at 0x100576890>
+  inst: <__console__.C object at 0x100576990>
+  cls:  <class '__console__.C'>
+>>> i
+<__console__.C object at 0x100576990>
+>>> C.attr
+calling __get__ on instance of NoisyDescriptor
+  self: <__console__.NoisyDescriptor object at 0x100576890>
+  inst: None
+  cls:  <class '__console__.C'>
+>>> 
+>>> # Some motivation
+>>> class C:
+...     def a_method(self):
+...         print("called a method on instance %s" % id(self))
+... 
+>>> i = C()
+>>> i.a_method()
+called a method on instance 4300696336
+>>> C.a_method(i)
+called a method on instance 4300696336
+>>> i.a_method
+<bound method C.a_method of <__console__.C object at 0x100576b10>>
+>>> C.a_method
+<function a_method at 0x100582738>
+>>> i.__dict__
+{}
+>>> C.__dict__['a_method']
+<function a_method at 0x100582738>
+>>> C.__dict__['a_method'].__get__(i, C)
+<bound method C.a_method of <__console__.C object at 0x100576b10>>
+>>> C.__dict__['a_method'].__get__(None, C)
+<function a_method at 0x100582738>
+>>> 
+>>> # What about setting attributes?
+>>> class C:
+...     class_attr = 123
+...     def __init__(self):
+...         self.instance_attr = 456
+... 
+>>> i = C()
+>>> i.__dict__
+{'instance_attr': 456}
+>>> C.__dict__
+dict_proxy({'__module__': '__console__', 'class_attr': 123, '__dict__': <attribute '__dict__' of 'C' objects>, '__weakref__': <attribute '__weakref__' of 'C' objects>, '__doc__': None, '__init__': <function __init__ at 0x100582a68>})
+>>> i.instance_attr = 321
+>>> i.__dict__
+{'instance_attr': 321}
+>>> i.class_attr = 654
+>>> i.__dict__
+{'instance_attr': 321, 'class_attr': 654}
+>>> C.__dict__
+dict_proxy({'__module__': '__console__', 'class_attr': 123, '__dict__': <attribute '__dict__' of 'C' objects>, '__weakref__': <attribute '__weakref__' of 'C' objects>, '__doc__': None, '__init__': <function __init__ at 0x100582a68>})
+>>> 
+>>> # A useless example
+>>> class NoisyDescriptor:
+...     def __set__(self, inst, val):
+...         print("calling __set__ on instance of NoisyDescriptor")
+...         print("  self:", self)
+...         print("  inst:", inst)
+...         print("  val: ", val)
+... 
+>>> class C:
+...     attr = NoisyDescriptor()
+... 
+>>> i = C()
+>>> i.attr = 123
+calling __set__ on instance of NoisyDescriptor
+  self: <__console__.NoisyDescriptor object at 0x100576c50>
+  inst: <__console__.C object at 0x100576e10>
+  val:  123
+>>> C.attr = 123
+>>> C.__dict__
+dict_proxy({'__dict__': <attribute '__dict__' of 'C' objects>, '__module__': '__console__', '__weakref__': <attribute '__weakref__' of 'C' objects>, 'attr': 123, '__doc__': None})
+>>> 
+>>> # A less useless example
+>>> class TypedAttribute:
+...     def __init__(self, name, typ):
+...         self.name = name
+...         self.typ = typ
+...     def __set__(self, inst, val):
+...         if isinstance(val, self.typ):
+...             inst.__dict__[self.name] = val
+...         else:
+...             raise TypeError
+... 
+>>> class Person:
+...     name = TypedAttribute('name', str)
+...     age = TypedAttribute('age', int)
+... 
+>>> i = Person()
+>>> i.name = 'Bill'
+>>> i.age = 25
+>>> i.__dict__
+{'age': 25, 'name': 'Bill'}
+>>> i.age = '25'
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+  File "<console>", line 9, in __set__
+TypeError
+>>> i.__dict__['age'] = 'definitely not a number'
+>>> i.age
+'definitely not a number'
+>>> 
+>>> # Slots
+>>> class C:
+...     __slots__ = ['x', 'y']
+... 
+>>> i = C()
+>>> i.x = 123
+>>> i.x
+123
+>>> i.y = 456
+>>> i.y
+456
+>>> i.z = 789
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+AttributeError: 'C' object has no attribute 'z'
+>>> i.__dict__
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+AttributeError: 'C' object has no attribute '__dict__'
+>>> C.__dict__
+dict_proxy({'y': <member 'y' of 'C' objects>, 'x': <member 'x' of 'C' objects>, '__module__': '__console__', '__slots__': ['x', 'y'], '__doc__': None})
+>>> C.__dict__['x'].__get__(i, C)
+123
+>>> i.x
+123
+>>> C.__dict__['x'].__set__(i, 789)
+>>> i.x
+789
+>>> 
+>>> # What are slots for?
+>>> #  * Efficiency!
+>>> #  * Faster access
+>>> #  * Lower occupancy
+>>> 
+>>> # Properties
+>>> class C:
+...     def __init__(self, x):
+...         self._x = x
+...     def get_x(self):
+...         print('getting x')
+...         return self._x
+...     def set_x(self, x):
+...         print('setting x')
+...         self._x = x
+...     x = property(get_x, set_x)
+... 
+>>> i = C(123)
+>>> i.__dict__
+{'_x': 123}
+>>> i.x
+getting x
+123
+>>> i.x = 456
+setting x
+>>> i.__dict__
+{'_x': 456}
+>>> C.__dict__['x']
+<property object at 0x10057daa0>
+>>> C.__dict__['x'].__get__(i, C)
+getting x
+456
+>>> i.x
+getting x
+456
+>>> C.__dict__['x'].__set__(i, 789)
+setting x
+>>> i.x
+getting x
+789
+>>> 
+>>> # A more useful example
+>>> class MarsProbe(object):
+...     def get_distance_meters(self):
+...         return self._distance_meters
+...     def set_distance_meters(self, dist):
+...         self._distance_meters = dist * 1.0
+...     def get_distance_yards(self):
+...         return self._distance_meters / 0.9144
+...     def set_distance_yards(self, dist):
+...         self._distance_meters = dist * 0.9144
+...     distance_meters = property(get_distance_meters, set_distance_meters)
+...     distance_yards = property(get_distance_yards, set_distance_yards)
+... 
+>>> i = MarsProbe()
+>>> i.distance_yards = 120
+>>> i.distance_meters
+109.728
+>>> 
+>>> # How to choose between descriptors and properties?
+>>> #  * Properties work best when they know about the class
+>>> #  * Descriptors are more general, can often apply to any class
+>>> #  * Use descriptors if behaviour is different for classes and instances
+>>> #  * Properties are syntactic sugar
+>>> #  * Experiment!
+>>> 
+>>> # What next?
+>>> #  * Read
+>>> #     - Data Model reference
+>>> #     - 'Descriptor HowTo Guide'
+>>> #     - 'Unifying types and classes in Python 2.2'
+>>> #     - Guido's History of Python blog
+>>> #  * Read code
+>>> #     - Lots of good examples in Django, such as related objects
+>>> #     - Hyrbid attributes in SQLAlchemy
+>>> #     - Tools/demo/eiffel.py
+>>> #     - $ grep __get__ site_packages
+>>> #  * Play
+>>> #     - Implement methods, __slots__, properties in pure Python
+>>> #     - Tinker with the CPython source (grep for 'tp_descr_get')
+>>> #     - Work out why C.__dict__ has an attribute called '__dict__'
+>>> 
+>>> # Finally:
+>>> #  * Ignore everything I've just said
+>>> 
+>>> import this
+The Zen of Python, by Tim Peters
+
+Beautiful is better than ugly.
+Explicit is better than implicit.
+Simple is better than complex.
+Complex is better than complicated.
+Flat is better than nested.
+Sparse is better than dense.
+Readability counts.
+Special cases aren't special enough to break the rules.
+Although practicality beats purity.
+Errors should never pass silently.
+Unless explicitly silenced.
+In the face of ambiguity, refuse the temptation to guess.
+There should be one-- and preferably only one --obvious way to do it.
+Although that way may not be obvious at first unless you're Dutch.
+Now is better than never.
+Although never is often better than *right* now.
+If the implementation is hard to explain, it's a bad idea.
+If the implementation is easy to explain, it may be a good idea.
+Namespaces are one honking great idea -- let's do more of those!
+>>> 
+>>> # Thanks!
+>>> 
+>>> 
+>>> 
+>>> 
