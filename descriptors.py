@@ -5,6 +5,8 @@
 #
 # Peter Inglesby
 # @inglesp / peter.inglesby@gmail.com
+#
+# https://github.com/inglesp/Discovering-Descriptors
 ###
 
 # Goals:

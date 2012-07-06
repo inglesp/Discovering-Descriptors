@@ -9,6 +9,8 @@ Type "help", "copyright", "credits" or "license" for more information.
 >>> #
 >>> # Peter Inglesby
 >>> # @inglesp / peter.inglesby@gmail.com
+>>> #
+>>> # https://github.com/inglesp/Discovering-Descriptors
 >>> ###
 >>> 
 >>> # Goals:
@@ -59,7 +61,7 @@ calling __get__ on instance of RandomAttribute
 1
 >>> i.random_attr
 calling __get__ on instance of RandomAttribute
-7
+2
 >>> 
 >>> # A descriptor is an object that defines at least one of:
 >>> #  * __get__()
