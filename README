@@ -5,3 +5,6 @@ interpreter) from https://github.com/inglesp/prescons, and run with:
 
   $ python3 prescons.py descriptors.py
 
+There is a video of the talk here:
+
+  https://ep2012.europython.eu/conference/talks/discovering-descriptors
